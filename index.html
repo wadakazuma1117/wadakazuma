@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ガクマス★クエスト（塾内版）</title>
+  <!-- Tailwind CDN：デザインを簡単に整えるため -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Font（お好みで）-->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:"Noto Sans JP",sans-serif;}
+    /* 簡易モーダル */
+    .modal{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;}
+    .modal.show{display:flex;}
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center pt-6 gap-6">
+
+  <!-- ヘッダー -->
+  <h1 class="text-2xl font-bold">ガクマス★クエスト <span class="text-sm font-normal">(β)</span></h1>
+
+  <!-- ステータス表示 -->
+  <div id="stats" class="flex gap-4 text-lg"></div>
+
+  <!-- 敵HPバー -->
+  <div class="w-72 bg-gray-300 rounded">
+    <div id="hpBar" class="bg-green-500 h-6 rounded"></div>
+  </div>
+  <div id="enemyName" class="text-sm mb-4"></div>
+
+  <!-- アップグレード -->
+  <button id="upgradeBtn"
+    class="px-4 py-2 bg-indigo-600 text-white rounded shadow disabled:opacity-40">
+    攻撃力アップ (￥100)
+  </button>
+
+  <!-- クイズ用モーダル -->
+  <div id="quizModal" class="modal">
+    <div class="bg-white rounded-xl p-6 w-80 shadow-xl">
+      <h2 class="font-bold text-lg mb-2">クイズタイム！</h2>
+      <p id="quizQ" class="mb-4"></p>
+      <div id="quizOptions" class="flex flex-col gap-2"></div>
+      <p id="quizMsg" class="mt-4 font-bold"></p>
+      <button id="quizClose"
+        class="mt-4 px-3 py-1 bg-gray-400 text-white rounded hidden">
+        とじる
+      </button>
+    </div>
+  </div>
+
+<script>
+/* ---------- 初期パラメータ ---------- */
+let coins      = 0;     // 所持コイン
+let dps        = 10;    // 秒間ダメージ
+let enemyHPMax = 100;   // 敵HP
+let enemyHP    = enemyHPMax;
+let killCount  = 0;     // 討伐数（レベル用）
+let quizTimer  = 0;     // クイズ発生用タイマー
+
+const enemyName = document.getElementById('enemyName');
+const hpBar     = document.getElementById('hpBar');
+const statsDiv  = document.getElementById('stats');
+const upgradeBtn= document.getElementById('upgradeBtn');
+
+/* ---------- クイズ ---------- */
+const quizzes = [
+  {q:'日本国憲法が施行された年は？',
+   opts:['1945年','1946年','1947年'], ans:2},
+  {q:'元素記号「Fe」が表す金属は？',
+   opts:['銅','鉄','銀'], ans:1},
+  {q:'英語で「walk」の過去形は？',
+   opts:['walked','walking','walks'], ans:0},
+  {q:'三角形の内角の和は？',
+   opts:['90°','180°','360°'], ans:1},
+  {q:'沖縄県の県庁所在地は？',
+   opts:['那覇市','名古屋市','長崎市'], ans:0}
+];
+
+/* ---------- 画面更新 ---------- */
+function renderStats(){
+  statsDiv.innerHTML =
+    `<span>コイン：<b>${coins}</b></span>
+     <span>攻撃力：<b>${dps}/秒</b></span>`;
+}
+function renderEnemy(){
+  enemyName.textContent=`テストモンスター (HP ${enemyHP}/${enemyHPMax})`;
+  hpBar.style.width = (enemyHP/enemyHPMax*100)+'%';
+}
+
+/* ---------- バトルループ（1秒毎） ---------- */
+setInterval(()=>{
+  // 与ダメージ
+  enemyHP -= dps;
+  if(enemyHP<=0){
+    coins += 50;            // 報酬
+    killCount++;
+    enemyHPMax = Math.round(enemyHPMax*1.2); // 徐々に強化
+    enemyHP    = enemyHPMax;
+  }
+  // クイズ発生カウント
+  quizTimer++;
+  if(quizTimer>=15){        // 15秒ごとにクイズ
+     quizTimer=0;
+     openQuiz();
+  }
+  renderStats();
+  renderEnemy();
+},1000);
+
+/* ---------- アップグレード処理 ---------- */
+upgradeBtn.addEventListener('click',()=>{
+  if(coins>=100){
+    coins -= 100;
+    dps   += 10;
+    renderStats();
+  }
+});
+
+/* ---------- クイズ表示 ---------- */
+function openQuiz(){
+  const modal = document.getElementById('quizModal');
+  const qEl   = document.getElementById('quizQ');
+  const optDiv= document.getElementById('quizOptions');
+  const msg   = document.getElementById('quizMsg');
+  const close = document.getElementById('quizClose');
+
+  // ランダムに1問選択
+  const quiz  = quizzes[Math.floor(Math.random()*quizzes.length)];
+  qEl.textContent = quiz.q;
+  optDiv.innerHTML='';
+  msg.textContent='';
+  close.classList.add('hidden');
+
+  quiz.opts.forEach((text,i)=>{
+    const btn=document.createElement('button');
+    btn.textContent=text;
+    btn.className='px-3 py-2 bg-emerald-500/80 hover:bg-emerald-600 text-white rounded';
+    btn.onclick=()=>{
+       if(i===quiz.ans){
+         msg.textContent='正解！コイン＋100';
+         coins+=100;
+       }else{
+         msg.textContent='ざんねん…';
+       }
+       renderStats();
+       // 回答後は選択肢を無効化
+       [...optDiv.children].forEach(b=>b.disabled=true);
+       close.classList.remove('hidden');
+    };
+    optDiv.appendChild(btn);
+  });
+
+  close.onclick=()=>modal.classList.remove('show');
+  modal.classList.add('show');
+}
+
+renderStats();
+renderEnemy();
+</script>
+</body>
+</html>
